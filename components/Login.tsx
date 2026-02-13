@@ -22,7 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         try {
             // Verificar na tabela Logins se existe um usuário com esse email e senha
             const { data, error } = await supabase
-                .from('Logins')
+                .from('logins')
                 .select('*')
                 .eq('email', email)
                 .eq('senha', password)
