@@ -257,9 +257,18 @@ const Contracts: React.FC<ContractsProps> = ({ contracts, setContracts, setBills
                 const parcelas = parseInt(formData.parcela) || 0;
                 const valorReceber = parseFloat(formData.receber);
 
+                console.log('🔍 Verificando criação de parcelas:', { parcelas, valorReceber });
+
                 // 1. Criar contas a receber parceladas
                 if (parcelas > 0 && valorReceber > 0) {
+                    console.log('✅ Criando parcelas em Contas a Receber...');
                     await createMonthlyBills(contractData, parcelas, valorReceber);
+                    alert(`✅ Contrato criado com sucesso!\n\n${parcelas} parcelas de R$ ${(valorReceber / parcelas).toFixed(2)} foram adicionadas em "Contas a Pagar/Receber"`);
+                } else if (valorReceber > 0) {
+                    // Se não tem parcelas mas tem valor a receber, criar uma única entrada
+                    console.log('✅ Criando entrada única em Contas a Receber...');
+                    await createMonthlyBills(contractData, 1, valorReceber);
+                    alert(`✅ Contrato criado com sucesso!\n\nR$ ${valorReceber.toFixed(2)} foi adicionado em "Contas a Pagar/Receber"`);
                 }
 
                 // 2. Adicionar ao fluxo de caixa (total pago)
@@ -335,6 +344,7 @@ const Contracts: React.FC<ContractsProps> = ({ contracts, setContracts, setBills
             setConfirmDelete({ isOpen: false, id: null });
 
             console.log(`✅ Contrato, contas e fluxo de caixa de "${nomeCliente}" foram removidos`);
+            alert(`✅ Contrato removido com sucesso!\n\nTodas as parcelas de "${nomeCliente}" foram removidas de "Contas a Pagar/Receber" e do "Fluxo de Caixa".`);
         } catch (error) {
             console.error("Erro ao deletar:", error);
             alert("Erro ao remover contrato.");
