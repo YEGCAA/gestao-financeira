@@ -23,12 +23,14 @@ git commit -m "Deploy: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 
 # 4. Fazer push para gh-pages
 Write-Host "`n🌐 Fazendo deploy para GitHub Pages..." -ForegroundColor Yellow
-git push -f https://github.com/YEGCAA/gestao-financeira.git main:gh-pages
+$remoteUrl = git -C .. config --get remote.origin.url
+git push -f $remoteUrl main:gh-pages
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n✅ Deploy concluído com sucesso!" -ForegroundColor Green
     Write-Host "🌍 Sua aplicação estará disponível em: https://yegcaa.github.io/gestao-financeira/" -ForegroundColor Cyan
-} else {
+}
+else {
     Write-Host "`n❌ Erro no deploy!" -ForegroundColor Red
 }
 
