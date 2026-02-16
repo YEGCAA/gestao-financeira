@@ -140,7 +140,9 @@ const ImportTransactions: React.FC<ImportTransactionsProps> = ({ setTransactions
           Data: timestamp.toISOString(),
           Descrição: rest.description,
           Valor: valorFinal,
-          Saldo: rest.balance
+          Saldo: rest.balance,
+          tipo: type,
+          tags: rest.tags || []
         };
       });
 
@@ -158,11 +160,13 @@ const ImportTransactions: React.FC<ImportTransactionsProps> = ({ setTransactions
         id: t.id,
         date: t.Data,
         description: t.Descrição,
-        amount: t.Valor,
+        amount: Math.abs(t.Valor),
         balance: t.Saldo,
-        type: t.Valor >= 0 ? 'INCOME' : 'EXPENSE', // Infere tipo do valor
-        categoryId: '', // Não existe na tabela
-        subCategoryId: '' // Não existe na tabela
+        type: t.tipo || (t.Valor >= 0 ? 'INCOME' : 'EXPENSE'),
+        categoryId: t.categoria_id || '',
+        subCategoryId: t.subcategoria_id || '',
+        notas: t.notas || '',
+        tags: Array.isArray(t.tags) ? t.tags : []
       }));
 
       setTransactions(prev => [...insertedTransactions, ...prev]);

@@ -68,14 +68,30 @@ const Contracts: React.FC<ContractsProps> = ({ contracts, setContracts, setBills
 
     const handleEdit = (contract: Contract) => {
         setEditingId(contract.id);
+
+        // Função robusta para formatar datas para YYYY-MM-DD ignorando fuso horário
+        const formatDateForInput = (dateString: string | null) => {
+            if (!dateString) return '';
+            // Se já estiver no formato puro YYYY-MM-DD (comum vindo do banco), retorna direto
+            if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) return dateString;
+
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '';
+
+            // Compensa o fuso horário para não mudar o dia ao converter para ISO string
+            const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+            const normalizedDate = new Date(date.getTime() + userTimezoneOffset);
+            return normalizedDate.toISOString().split('T')[0];
+        };
+
         const formDataEdit = {
             nome_cliente: contract.nome_cliente,
             servico: contract.servico,
             pago: contract.pago.toString(),
             receber: contract.receber.toString(),
-            data_pagamento: contract.data_pagamento || '',
-            inicio_contrato: contract.inicio_contrato,
-            final_contrato: contract.final_contrato,
+            data_pagamento: formatDateForInput(contract.data_pagamento),
+            inicio_contrato: formatDateForInput(contract.inicio_contrato),
+            final_contrato: formatDateForInput(contract.final_contrato),
             parcela: contract.parcela?.toString() || ''
         };
         setFormData(formDataEdit);
@@ -511,7 +527,11 @@ const Contracts: React.FC<ContractsProps> = ({ contracts, setContracts, setBills
                             <div>
                                 <label className="text-sm font-medium text-gray-500">Data de Pagamento</label>
                                 <p className="text-base text-gray-900">
-                                    {selectedContract.data_pagamento ? new Date(selectedContract.data_pagamento).toLocaleDateString('pt-BR') : 'Não pago'}
+                                    {selectedContract.data_pagamento ? (() => {
+                                        const cleanDate = selectedContract.data_pagamento.split('T')[0].split(' ')[0];
+                                        const parts = cleanDate.split('-');
+                                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : selectedContract.data_pagamento;
+                                    })() : 'Não pago'}
                                 </p>
                             </div>
 
@@ -529,11 +549,24 @@ const Contracts: React.FC<ContractsProps> = ({ contracts, setContracts, setBills
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-sm font-medium text-gray-500">Início do Contrato</label>
-                                    <p className="text-base text-gray-900">{new Date(selectedContract.inicio_contrato).toLocaleDateString('pt-BR')}</p>
+                                    <p className="text-base text-gray-900">
+                                        {(() => {
+                                            const cleanDate = selectedContract.inicio_contrato.split('T')[0].split(' ')[0];
+                                            const parts = cleanDate.split('-');
+                                            return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : selectedContract.inicio_contrato;
+                                        })()}
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="text-sm font-medium text-gray-500">Fim do Contrato</label>
-                                    <p className="text-base text-gray-900">{new Date(selectedContract.final_contrato).toLocaleDateString('pt-BR')}</p>
+                                    <p className="text-base text-gray-900">
+                                        {(() => {
+                                            const rawDate = selectedContract.final_contrato;
+                                            const cleanDate = rawDate.split('T')[0].split(' ')[0];
+                                            const parts = cleanDate.split('-');
+                                            return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : rawDate;
+                                        })()}
+                                    </p>
                                 </div>
                             </div>
 

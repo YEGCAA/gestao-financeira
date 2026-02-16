@@ -1,15 +1,15 @@
-
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Search, ArrowUp, ArrowDown, Loader2, CheckCircle, AlertTriangle, ArrowDownToLine } from 'lucide-react';
-import { Investment, TransactionType } from '../types';
+import { Investment, TransactionType, Transaction } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface InvestmentsProps {
   investments: Investment[];
   setInvestments: React.Dispatch<React.SetStateAction<Investment[]>>;
+  onTransactionsChange: React.Dispatch<React.SetStateAction<Transaction[]>>;
 }
 
-const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }) => {
+const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments, onTransactionsChange }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -72,6 +72,41 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
           date_lancamento: data[0].data_lancamento
         };
         setInvestments(prev => [inserted, ...prev]);
+
+        // INTEGRAÇÃO AUTOMÁTICA COM FLUXO DE CAIXA
+        // Se for uma entrada no investimento (usuário colocando dinheiro), gera uma SAÍDA no fluxo de caixa
+        // Se for uma saída no investimento (usuário sacando dinheiro), gera uma ENTRADA no fluxo de caixa
+        const transactionType = formData.type === 'INCOME' ? 'EXPENSE' : 'INCOME';
+        const transactionLabel = formData.type === 'INCOME' ? 'Aplicação em Investimento' : 'Resgate de Investimento';
+
+        const cashFlowEntry = {
+          Data: formData.date_lancamento,
+          Descrição: `${transactionLabel}: ${formData.description}`,
+          Valor: parseFloat(formData.amount),
+          Saldo: 0,
+          tipo: transactionType,
+          categoria_id: null,
+          subcategoria_id: null
+        };
+
+        const { data: cashData, error: cashError } = await supabase
+          .from('Fluxo de caixa')
+          .insert([cashFlowEntry])
+          .select();
+
+        if (!cashError && cashData) {
+          const newTrans: Transaction = {
+            id: cashData[0].id,
+            date: cashData[0].Data,
+            description: cashData[0].Descrição,
+            amount: cashData[0].Valor,
+            balance: 0,
+            type: transactionType,
+            categoryId: '',
+            subCategoryId: ''
+          };
+          onTransactionsChange(prev => [newTrans, ...prev]);
+        }
       }
       setSyncStatus('success');
       setTimeout(() => handleCloseModal(), 1000);
@@ -79,7 +114,7 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
       console.error("❌ Erro ao salvar:", error);
       console.error("❌ Detalhes do erro:", error.message, error.details, error.hint);
       setSyncStatus('error');
-      alert(`Falha ao sincronizar: ${error.message || 'Erro desconhecido'}`);
+      alert(`Falha ao sincronizar: ${error.message || 'Erro desconhecido'} `);
     } finally {
       setIsSubmitting(false);
     }
@@ -96,13 +131,39 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (investment: Investment) => {
     if (confirm('Deseja realmente excluir este investimento?')) {
       try {
-        const { error } = await supabase.from('investimento').delete().eq('id', id);
+        // 1. Tentar encontrar e excluir a transação correspondente no Fluxo de Caixa
+        const transactionLabel = investment.type === 'INCOME' ? 'Aplicação em Investimento' : 'Resgate de Investimento';
+        const fullDescription = `${transactionLabel}: ${investment.description}`;
+
+        console.log('🔍 Procurando transação para excluir:', { fullDescription, data: investment.date_lancamento });
+
+        const { data: transData, error: searchError } = await supabase
+          .from('Fluxo de caixa')
+          .select('id')
+          .eq('Descrição', fullDescription)
+          .eq('Data', investment.date_lancamento)
+          .eq('Valor', investment.amount);
+
+        if (!searchError && transData && transData.length > 0) {
+          const transId = transData[0].id;
+          console.log('🗑️ Excluindo transação do Fluxo de Caixa:', transId);
+          await supabase.from('Fluxo de caixa').delete().eq('id', transId);
+
+          // Atualizar estado local das transações se a função estiver disponível
+          if (onTransactionsChange) {
+            onTransactionsChange(prev => prev.filter(t => t.id !== transId));
+          }
+        }
+
+        // 2. Excluir o investimento
+        const { error } = await supabase.from('investimento').delete().eq('id', investment.id);
         if (error) throw error;
-        setInvestments(prev => prev.filter(i => i.id !== id));
-        alert("Excluído com sucesso no Supabase.");
+
+        setInvestments(prev => prev.filter(i => i.id !== investment.id));
+        alert("Investimento e sua respectiva movimentação no caixa foram excluídos.");
       } catch (error) {
         console.error("Erro ao deletar:", error);
         alert("Erro ao remover do banco de dados.");
@@ -111,7 +172,7 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
   };
 
   const handleDeleteAll = async () => {
-    const confirmMessage = `⚠️ ATENÇÃO! Esta ação irá EXCLUIR TODOS OS ${investments.length} INVESTIMENTOS da tabela "investimento" no Supabase.\\n\\nEsta ação é IRREVERSÍVEL!\\n\\nDigite "EXCLUIR TUDO" para confirmar:`;
+    const confirmMessage = `⚠️ ATENÇÃO! Esta ação irá EXCLUIR TODOS OS ${investments.length} INVESTIMENTOS da tabela "investimento" no Supabase.\\n\\nEsta ação é IRREVERSÍVEL!\\n\\nDigite "EXCLUIR TUDO" para confirmar: `;
 
     const userInput = prompt(confirmMessage);
 
@@ -167,10 +228,15 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
     if (!searchTerm) return true;
 
     const search = searchTerm.toLowerCase();
-    const date = new Date(investment.date_lancamento).toLocaleDateString('pt-BR');
+
+    // Formatação de data robusta para busca (DD/MM/AAAA)
+    const datePart = investment.date_lancamento.split('T')[0];
+    const parts = datePart.split('-');
+    const dateFormatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : investment.date_lancamento;
+
     const description = investment.description.toLowerCase();
 
-    return date.includes(search) || description.includes(search);
+    return dateFormatted.includes(search) || description.includes(search);
   });
 
   return (
@@ -242,7 +308,13 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
             {filteredInvestments.length > 0 ? (
               filteredInvestments.map(inv => (
                 <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-slate-600">{new Date(inv.date_lancamento).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {(() => {
+                      const datePart = inv.date_lancamento.split('T')[0];
+                      const parts = datePart.split('-');
+                      return parts.length === 3 ? `${parts[2]}/${parts[1]}` : inv.date_lancamento;
+                    })()}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className={`p-1 rounded-full ${inv.type === 'INCOME' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
@@ -259,7 +331,7 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, setInvestments }
                       <button onClick={() => handleEdit(inv)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
                         <Edit2 size={16} />
                       </button>
-                      <button onClick={() => handleDelete(inv.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
+                      <button onClick={() => handleDelete(inv)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
                         <Trash2 size={16} />
                       </button>
                     </div>

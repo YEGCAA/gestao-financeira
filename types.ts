@@ -10,6 +10,7 @@ export interface Category {
   id: string;
   name: string;
   type: TransactionType;
+  color?: string;
   subCategories: SubCategory[];
 }
 
@@ -46,8 +47,11 @@ export interface ForecastExpense {
   id: string;
   description: string; // descrição
   amount: number; // valor
+  type: TransactionType; // INCOME ou EXPENSE
   recorrente: boolean; // recorrente (sim/não)
   mes: string; // mês
+  categoryId?: string;
+  subCategoryId?: string;
 }
 
 export interface Contract {

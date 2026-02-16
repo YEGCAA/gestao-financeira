@@ -18,6 +18,7 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
   const [formData, setFormData] = useState({
     name: '',
     type: 'INCOME' as TransactionType,
+    color: '#10b981',
   });
   const [subFormData, setSubFormData] = useState({
     name: ''
@@ -42,19 +43,21 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
           .from('Categoria')
           .update({
             Categoria: formData.name,
-            etiquetas: formData.type === 'INCOME' ? 'entrada' : 'saída'
+            etiquetas: formData.type === 'INCOME' ? 'entrada' : 'saída',
+            cor: formData.color
           })
           .eq('id', editingId)
           .select();
 
         if (error) throw error;
-        setCategories(prev => prev.map(c => c.id === editingId ? { ...c, name: formData.name, type: formData.type } : c));
+        setCategories(prev => prev.map(c => c.id === editingId ? { ...c, name: formData.name, type: formData.type, color: formData.color } : c));
       } else {
         const { data, error } = await supabase
           .from('Categoria')
           .insert([{
             Categoria: formData.name,
-            etiquetas: formData.type === 'INCOME' ? 'entrada' : 'saída'
+            etiquetas: formData.type === 'INCOME' ? 'entrada' : 'saída',
+            cor: formData.color
           }])
           .select();
 
@@ -63,6 +66,7 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
           id: data[0].id,
           name: formData.name,
           type: formData.type,
+          color: formData.color,
           subCategories: []
         };
         setCategories(prev => [...prev, newCat]);
@@ -70,7 +74,7 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
 
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', type: 'INCOME' });
+      setFormData({ name: '', type: 'INCOME', color: '#10b981' });
     } catch (error: any) {
       console.error("Erro ao salvar categoria:", error);
       alert(`Erro: ${error.message || 'Falha na conexão'}`);
@@ -164,7 +168,7 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
         <button
           onClick={() => {
             setEditingId(null);
-            setFormData({ name: '', type: 'INCOME' });
+            setFormData({ name: '', type: 'INCOME', color: '#10b981' });
             setIsModalOpen(true);
           }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -191,7 +195,10 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
                     >
                       {expandedCategories.has(category.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     </button>
-                    <Tag size={16} className="text-green-600" />
+                    <div
+                      className="w-4 h-4 rounded-full border border-gray-200"
+                      style={{ backgroundColor: category.color }}
+                    />
                     <span className="font-medium text-gray-900">{category.name}</span>
                     <span className="text-xs text-gray-500">({category.subCategories.length})</span>
                   </div>
@@ -209,7 +216,11 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
                     <button
                       onClick={() => {
                         setEditingId(category.id);
-                        setFormData({ name: category.name, type: category.type });
+                        setFormData({
+                          name: category.name,
+                          type: category.type,
+                          color: category.color || '#10b981'
+                        });
                         setIsModalOpen(true);
                       }}
                       className="text-blue-600 hover:bg-blue-50 p-1 rounded"
@@ -264,7 +275,10 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
                     >
                       {expandedCategories.has(category.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     </button>
-                    <Tag size={16} className="text-red-600" />
+                    <div
+                      className="w-4 h-4 rounded-full border border-gray-200"
+                      style={{ backgroundColor: category.color }}
+                    />
                     <span className="font-medium text-gray-900">{category.name}</span>
                     <span className="text-xs text-gray-500">({category.subCategories.length})</span>
                   </div>
@@ -282,7 +296,11 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
                     <button
                       onClick={() => {
                         setEditingId(category.id);
-                        setFormData({ name: category.name, type: category.type });
+                        setFormData({
+                          name: category.name,
+                          type: category.type,
+                          color: category.color || '#ef4444'
+                        });
                         setIsModalOpen(true);
                       }}
                       className="text-blue-600 hover:bg-blue-50 p-1 rounded"
@@ -354,13 +372,32 @@ const Categories: React.FC<CategoriesProps> = ({ categories, setCategories }) =>
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={formData.color}
+                    onChange={e => setFormData({ ...formData, color: e.target.value })}
+                    className="h-10 w-20 p-1 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.color}
+                    onChange={e => setFormData({ ...formData, color: e.target.value })}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingId(null);
-                    setFormData({ name: '', type: 'INCOME' });
+                    setFormData({ name: '', type: 'INCOME', color: '#10b981' });
                   }}
                   className="flex-1 py-2 text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition-colors"
                 >

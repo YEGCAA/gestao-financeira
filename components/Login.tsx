@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { LogIn, Mail, Lock, Eye, EyeOff, TrendingUp, DollarSign, PieChart } from 'lucide-react';
+import { LogIn, Eye, EyeOff, TrendingUp, Shield, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginProps {
@@ -20,7 +19,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setError('');
 
         try {
-            // Verificar na tabela Logins se existe um usuário com esse email e senha
             const { data, error } = await supabase
                 .from('Logins')
                 .select('*')
@@ -32,7 +30,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 throw new Error('Email ou senha incorretos');
             }
 
-            // Login bem-sucedido
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('userEmail', email);
             onLoginSuccess();
@@ -44,226 +41,165 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Animated background elements */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-float"></div>
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-float-delayed"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl"></div>
-            </div>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4 relative overflow-hidden" style={{ fontFamily: "'Poppins', 'Inter', sans-serif" }}>
+            {/* Google Fonts Import */}
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-            {/* Grid pattern overlay */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjAzIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40"></div>
+            {/* Background decoration */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-200/30 via-transparent to-transparent"></div>
 
-            <div className="w-full max-w-6xl relative z-10 grid lg:grid-cols-2 gap-8 items-center">
-                {/* Left side - Branding & Features */}
-                <div className="hidden lg:block space-y-8 animate-fadeInLeft">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3 mb-6">
-                            <img src="https://i.ibb.co/gZcFGqVt/Brand-03.png" alt="Even Digital" className="h-12 w-auto" />
-                            <div>
-                                <h1 className="text-4xl font-bold text-white">Even Digital</h1>
-                                <p className="text-blue-300 text-lg">Gestão Financeira Inteligente</p>
+            {/* Floating shapes */}
+            <div className="absolute top-20 left-10 w-20 h-20 bg-blue-200/30 rounded-full blur-2xl animate-pulse"></div>
+            <div className="absolute bottom-20 right-10 w-32 h-32 bg-blue-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-blue-100/40 rounded-full blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+
+            {/* Subtle pattern overlay */}
+            <div className="absolute inset-0 opacity-5" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230ea5e9' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }}></div>
+
+            {/* Login Card */}
+            <div className="relative z-10 w-full max-w-md">
+                <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-blue-100/50 p-8 relative overflow-hidden">
+                    {/* Top accent bar */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400"></div>
+
+                    {/* Logo and Title */}
+                    <div className="text-center mb-8">
+                        <div className="flex justify-center mb-4">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-blue-400/20 rounded-2xl blur-xl"></div>
+                                <img src="https://i.ibb.co/gZcFGqVt/Brand-03.png" alt="Even Digital" className="h-16 w-auto relative z-10" />
                             </div>
                         </div>
-
-                        <p className="text-white/80 text-lg leading-relaxed">
-                            Controle total das suas finanças em um só lugar. Simplifique sua gestão financeira com ferramentas poderosas e intuitivas.
+                        <h1 className="text-3xl font-bold mb-2">
+                            <span className="text-gray-800">EVEN</span>
+                            <span className="text-blue-500">DIGITAL</span>
+                        </h1>
+                        <p className="text-gray-500 text-sm font-medium tracking-wide">
+                            Financial Management Center
                         </p>
                     </div>
 
-                    {/* Features */}
-                    <div className="space-y-4">
-                        <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
-                            <div className="p-3 bg-blue-500/20 rounded-xl">
-                                <TrendingUp className="text-blue-400" size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold mb-1">Análise em Tempo Real</h3>
-                                <p className="text-white/60 text-sm">Acompanhe suas receitas e despesas instantaneamente</p>
+                    {/* Features Pills */}
+                    <div className="flex justify-center gap-2 mb-6">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+                            <Shield size={14} className="text-blue-500" />
+                            <span className="text-xs font-medium text-blue-600">Seguro</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+                            <Zap size={14} className="text-blue-500" />
+                            <span className="text-xs font-medium text-blue-600">Rápido</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+                            <TrendingUp size={14} className="text-blue-500" />
+                            <span className="text-xs font-medium text-blue-600">Inteligente</span>
+                        </div>
+                    </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-xl">
+                            <p className="text-red-600 text-sm text-center font-medium">{error}</p>
+                        </div>
+                    )}
+
+                    {/* Form */}
+                    <form onSubmit={handleLogin} className="space-y-5">
+                        {/* Email Input */}
+                        <div>
+                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                Usuário
+                            </label>
+                            <input
+                                type="email"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full px-4 py-3.5 bg-blue-50/50 border-2 border-blue-100 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all font-medium"
+                                placeholder="Digite seu usuário"
+                            />
+                        </div>
+
+                        {/* Password Input */}
+                        <div>
+                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                Senha
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-3.5 bg-blue-50/50 border-2 border-blue-100 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all pr-12 font-medium"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
                             </div>
                         </div>
 
-                        <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
-                            <div className="p-3 bg-indigo-500/20 rounded-xl">
-                                <PieChart className="text-indigo-400" size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold mb-1">Relatórios Detalhados</h3>
-                                <p className="text-white/60 text-sm">Visualize gráficos e dashboards personalizados</p>
-                            </div>
+                        {/* Remember me checkbox */}
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded border-blue-300 text-blue-500 focus:ring-blue-400"
+                                />
+                                <span className="text-sm text-gray-600 font-medium">Lembrar-me</span>
+                            </label>
+                            <a href="#" className="text-sm text-blue-500 hover:text-blue-600 font-medium transition-colors">
+                                Esqueceu a senha?
+                            </a>
                         </div>
 
-                        <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
-                            <div className="p-3 bg-cyan-500/20 rounded-xl">
-                                <DollarSign className="text-cyan-400" size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold mb-1">Previsão de Gastos</h3>
-                                <p className="text-white/60 text-sm">Planeje seu futuro financeiro com precisão</p>
-                            </div>
-                        </div>
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 mt-6"
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <>
+                                    Acessar Dashboard
+                                    <LogIn size={20} />
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-3 my-6">
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent"></div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="text-center">
+                        <p className="text-gray-400 text-xs font-medium">
+                            © 2026 Even Digital. Todos os direitos reservados.
+                        </p>
                     </div>
                 </div>
 
-                {/* Right side - Login Form */}
-                <div className="w-full animate-fadeInRight">
-                    {/* Mobile logo */}
-                    <div className="lg:hidden text-center mb-8">
-                        <img src="https://i.ibb.co/gZcFGqVt/Brand-03.png" alt="Even Digital" className="h-12 w-auto mb-3 mx-auto" />
-                        <h1 className="text-3xl font-bold text-white mb-1">Even Digital</h1>
-                        <p className="text-blue-300">Gestão Financeira</p>
+                {/* Bottom decoration */}
+                <div className="mt-8 text-center">
+                    <div className="flex justify-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-300"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-200"></div>
                     </div>
-
-                    <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20">
-                        <div className="mb-8">
-                            <h2 className="text-3xl font-bold text-white mb-2">Bem-vindo de volta!</h2>
-                            <p className="text-white/60">Entre com suas credenciais para continuar</p>
-                        </div>
-
-                        {error && (
-                            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-white text-sm flex items-center gap-2 animate-shake">
-                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleLogin} className="space-y-5">
-                            <div>
-                                <label className="block text-white/90 text-sm font-medium mb-2">Email</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-blue-400 transition-colors" size={20} />
-                                    <input
-                                        type="email"
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-white/10 transition-all"
-                                        placeholder="seu@email.com"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-white/90 text-sm font-medium mb-2">Senha</label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-blue-400 transition-colors" size={20} />
-                                    <input
-                                        type={showPassword ? 'text' : 'password'}
-                                        required
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-12 pr-12 py-3.5 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-white/10 transition-all"
-                                        placeholder="••••••••"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                                    >
-                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between text-sm">
-                                <label className="flex items-center gap-2 text-white/70 cursor-pointer group">
-                                    <input type="checkbox" className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-2 focus:ring-blue-500/50" />
-                                    <span className="group-hover:text-white transition-colors">Lembrar-me</span>
-                                </label>
-                                <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                                    Esqueceu a senha?
-                                </a>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:shadow-blue-500/50 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                            >
-                                {isLoading ? (
-                                    <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <LogIn size={20} />
-                                        Entrar
-                                    </>
-                                )}
-                            </button>
-                        </form>
-
-                        <div className="mt-6 pt-6 border-t border-white/10 text-center">
-                            <p className="text-white/60 text-sm">
-                                Não tem uma conta? <a href="#" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">Criar conta</a>
-                            </p>
-                        </div>
-                    </div>
-
-                    <p className="text-center text-white/40 text-sm mt-6">
-                        © 2026 Even Digital. Todos os direitos reservados.
-                    </p>
                 </div>
             </div>
-
-            <style>{`
-        @keyframes fadeInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes fadeInRight {
-          from {
-            opacity: 0;
-            transform: translateX(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
-        .animate-fadeInLeft {
-          animation: fadeInLeft 0.8s ease-out;
-        }
-
-        .animate-fadeInRight {
-          animation: fadeInRight 0.8s ease-out;
-        }
-
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-
-        .animate-float-delayed {
-          animation: float 6s ease-in-out infinite;
-          animation-delay: 3s;
-        }
-
-        .animate-shake {
-          animation: shake 0.4s ease-out;
-        }
-      `}</style>
         </div>
     );
 };

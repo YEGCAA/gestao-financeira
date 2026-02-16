@@ -83,7 +83,8 @@ const App: React.FC = () => {
 
         console.log('📊 Resultado Fluxo de caixa:', { count: transData?.length || 0, error: transError });
         console.log('📊 Resultado Investimento:', { count: invData?.length || 0, error: invError });
-        console.log('📊 Resultado Previsão despesa:', { count: billsData?.length || 0, error: billsError });
+        console.log('📊 Resultado Contas Pagar/Receber:', { count: billsData?.length || 0, error: billsError });
+        console.log('📊 Resultado DRE (Entrada/Saída):', { count: forecastData?.length || 0, error: forecastError });
         console.log('📊 Resultado Categoria:', { count: catsData?.length || 0, error: catsError });
 
         if (transData && transData.length > 0) {
@@ -99,7 +100,7 @@ const App: React.FC = () => {
             categoryId: t.categoria_id || '',
             subCategoryId: t.subcategoria_id || '',
             notas: t.notas || '',
-            tags: t.tags || []
+            tags: Array.isArray(t.tags) ? t.tags : (t.Tags && Array.isArray(t.Tags) ? t.Tags : [])
           }));
           console.log('✅ Transações mapeadas:', mappedTrans.length);
           setTransactions(mappedTrans);
@@ -143,8 +144,11 @@ const App: React.FC = () => {
             id: f.id,
             description: f.descrição,
             amount: f.valor,
+            type: f.entrada_saida === 'INCOME' ? 'INCOME' : 'EXPENSE',
             recorrente: f['recorrente?'] === 'sim',
-            mes: f.mes
+            mes: f.mes,
+            categoryId: f.categoria,
+            subCategoryId: f.subcategoria
           }));
           setForecasts(mappedForecasts);
         } else {
@@ -183,6 +187,7 @@ const App: React.FC = () => {
               id: c.id,
               name: c.Categoria || c.nome || c.name || 'Sem nome',
               type: categoryType,
+              color: c.cor || (categoryType === 'INCOME' ? '#10b981' : '#ef4444'),
               subCategories: subCategories
             };
           });
@@ -251,15 +256,19 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case 'DASHBOARD':
-        return <Dashboard transactions={transactions} investments={investments} bills={bills} />;
+        return <Dashboard transactions={transactions} investments={investments} bills={bills} forecasts={forecasts} categories={categories} />;
       case 'TRANSACTIONS':
         return <Transactions transactions={transactions} setTransactions={setTransactions} categories={categories} />;
       case 'INVESTMENTS':
-        return <Investments investments={investments} setInvestments={setInvestments} />;
+        return <Investments
+          investments={investments}
+          setInvestments={setInvestments}
+          onTransactionsChange={setTransactions}
+        />;
       case 'BILLS':
         return <Bills bills={bills} setBills={setBills} />;
       case 'FORECAST':
-        return <ForecastExpenses forecasts={forecasts} setForecasts={setForecasts} />;
+        return <ForecastExpenses forecasts={forecasts} setForecasts={setForecasts} transactions={transactions} categories={categories} />;
       case 'CONTRACTS':
         return <Contracts contracts={contracts} setContracts={setContracts} setBills={setBills} setTransactions={setTransactions} />;
       case 'CATEGORIES':
@@ -267,7 +276,7 @@ const App: React.FC = () => {
       case 'IMPORT':
         return <ImportTransactions setTransactions={setTransactions} categories={categories} onComplete={() => setCurrentView('TRANSACTIONS')} />;
       default:
-        return <Dashboard transactions={transactions} investments={investments} bills={bills} />;
+        return <Dashboard transactions={transactions} investments={investments} bills={bills} forecasts={forecasts} categories={categories} />;
     }
   };
 
@@ -311,7 +320,7 @@ const App: React.FC = () => {
           />
           <SidebarItem
             icon={<Wallet size={20} />}
-            label="Previsão de Gastos"
+            label="Previsão"
             active={currentView === 'FORECAST'}
             onClick={() => setCurrentView('FORECAST')}
             collapsed={!isSidebarOpen}
@@ -376,7 +385,8 @@ const App: React.FC = () => {
               currentView === 'TRANSACTIONS' ? 'Fluxo de Caixa' :
                 currentView === 'INVESTMENTS' ? 'Investimentos' :
                   currentView === 'BILLS' ? 'Contas' :
-                    currentView === 'CATEGORIES' ? 'Categorias' : 'Importação'}
+                    currentView === 'FORECAST' ? 'Previsão' :
+                      currentView === 'CATEGORIES' ? 'Categorias' : 'Importação'}
           </h1>
           <div className="flex items-center gap-4">
             <div className="text-right">

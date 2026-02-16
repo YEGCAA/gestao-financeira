@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, FileText, ArrowUpCircle, ArrowDownCircle, Search } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Trash2, Edit2, FileText, ArrowUpCircle, ArrowDownCircle, Search, Calendar } from 'lucide-react';
 import { Bill } from '../types';
 import { supabase } from '../lib/supabase';
 import ConfirmModal from './ConfirmModal';
@@ -25,20 +25,63 @@ const Bills: React.FC<BillsProps> = ({ bills, setBills }) => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Gerar todos os 12 meses do ano atual (Janeiro → Dezembro)
-  const currentYear = new Date().getFullYear();
-  const availableMonths = Array.from({ length: 12 }, (_, i) => {
-    const month = i + 1;
-    return `${currentYear}-${String(month).padStart(2, '0')}`;
-  }); // Janeiro até Dezembro
+  // Extrair anos disponíveis das contas para o seletor
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(new Date().getFullYear()); // Sempre incluir ano atual
+    bills.forEach(bill => {
+      const year = parseInt(bill.data.substring(0, 4));
+      if (!isNaN(year)) years.add(year);
+    });
+    return Array.from(years).sort((a, b) => b - a); // Mostrar anos mais recentes primeiro
+  }, [bills]);
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const availableMonths = monthNames.map((name, i) => ({
+    id: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
+    name: name,
+    shortName: name.substring(0, 3)
+  }));
+
+  const toggleMonth = (monthId: string) => {
+    setSelectedMonths(prev =>
+      prev.includes(monthId)
+        ? prev.filter(id => id !== monthId)
+        : [...prev, monthId]
+    );
+  };
+
+  const selectAllMonths = () => setSelectedMonths([]);
+  const selectSingleMonth = (monthId: string) => setSelectedMonths([monthId]);
 
 
   const handleEdit = (bill: Bill) => {
     setEditingId(bill.id);
+
+    // Garantir que a data esteja no formato YYYY-MM-DD para o input HTML sem erro de fuso horário
+    // Função robusta para formatar datas para YYYY-MM-DD ignorando fuso horário
+    const formatDateForInput = (dateString: string | null) => {
+      if (!dateString) return '';
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) return dateString;
+
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+
+      // Compensa o fuso horário para não mudar o dia
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      const normalizedDate = new Date(date.getTime() + userTimezoneOffset);
+      return normalizedDate.toISOString().split('T')[0];
+    };
+
     setFormData({
-      data: bill.data,
+      data: formatDateForInput(bill.data),
       descricao: bill.descricao,
       entrada: bill.entrada.toString(),
       saida: bill.saida.toString()
@@ -59,10 +102,10 @@ const Bills: React.FC<BillsProps> = ({ bills, setBills }) => {
     }
 
     const billData = {
-      data: formData.data,
+      data: formData.data, // Já está no formato YYYY-MM-DD do input type="date"
       descricao: formData.descricao,
-      entrada: entradaValue,
-      'saída': saidaValue
+      entrada: parseFloat(formData.entrada) || 0,
+      'saída': parseFloat(formData.saida) || 0
     };
 
     console.log('📤 Tentando salvar:', billData);
@@ -132,11 +175,12 @@ const Bills: React.FC<BillsProps> = ({ bills, setBills }) => {
 
   // Filtrar contas
   const filteredBills = bills.filter(bill => {
-    // Filtro de mês
-    if (selectedMonth !== 'all') {
-      const billDate = new Date(bill.data);
-      const billMonth = `${billDate.getFullYear()}-${String(billDate.getMonth() + 1).padStart(2, '0')}`;
-      if (billMonth !== selectedMonth) return false;
+    // Filtro de mês (se vazio, mostra todos)
+    if (selectedMonths.length > 0) {
+      // Usar extração de string direta para evitar problemas de fuso horário com new Date()
+      // bill.data está no formato YYYY-MM-DD
+      const billMonth = bill.data.substring(0, 7); // Resulta em YYYY-MM
+      if (!selectedMonths.includes(billMonth)) return false;
     }
 
     // Filtro de busca
@@ -154,19 +198,33 @@ const Bills: React.FC<BillsProps> = ({ bills, setBills }) => {
       saida.includes(search);
   });
 
+  // Agrupar contas por mês para visualização organizada
+  const billsByMonth = filteredBills.reduce((acc: { [key: string]: Bill[] }, bill) => {
+    // Usar extração de string direta YYYY-MM
+    const monthKey = bill.data.substring(0, 7);
+    if (!acc[monthKey]) acc[monthKey] = [];
+    acc[monthKey].push(bill);
+    return acc;
+  }, {});
+
+  const sortedMonthKeys = Object.keys(billsByMonth).sort();
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar e Receber</h1>
-        <div className="flex gap-3">
-          <div className="relative w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Contas a Pagar e Receber</h1>
+          <p className="text-sm text-slate-500 mt-1">Gerencie seus compromissos financeiros mensais</p>
+        </div>
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              placeholder="Buscar por data, descrição ou valor..."
+              placeholder="Pesquisar contas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
             />
           </div>
           <button
@@ -175,129 +233,185 @@ const Bills: React.FC<BillsProps> = ({ bills, setBills }) => {
               setFormData({ data: new Date().toISOString().split('T')[0], descricao: '', entrada: '', saida: '' });
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-bold shadow-sm shadow-indigo-100"
           >
-            <Plus size={18} />
-            Nova Conta
+            <Plus size={20} />
+            <span className="hidden sm:inline">Nova Conta</span>
           </button>
         </div>
       </div>
 
-      {/* Filtro de Mês - Botões */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm font-semibold text-gray-700">Filtrar por mês:</span>
-          <span className="text-xs text-gray-500">({filteredBills.length} {filteredBills.length === 1 ? 'conta' : 'contas'})</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {availableMonths.map((month: string) => {
-            const [year, monthNum] = month.split('-');
-            const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('pt-BR', { month: 'short' });
+      {/* Seletor de Meses Clean com Seleção de Ano */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="text-indigo-600" size={20} />
+              <span className="font-bold text-slate-700">Calendário de Contas</span>
+            </div>
 
-            // Contar quantas parcelas tem neste mês
+            {/* Seletor de Ano */}
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                setSelectedYear(parseInt(e.target.value));
+                setSelectedMonths([]); // Limpa seleção ao mudar de ano para evitar confusão
+              }}
+              className="bg-slate-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={selectAllMonths}
+            className={`text-sm font-bold transition-colors ${selectedMonths.length === 0 ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`}
+          >
+            {selectedMonths.length > 0 ? 'Limpar Filtros e Ver Tudo' : 'Visualizando Tudo'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-3">
+          {availableMonths.map((m) => {
+            const isSelected = selectedMonths.includes(m.id);
             const count = bills.filter(bill => {
-              const billDate = new Date(bill.data);
-              const billMonth = `${billDate.getFullYear()}-${String(billDate.getMonth() + 1).padStart(2, '0')}`;
-              return billMonth === month;
+              return bill.data.substring(0, 7) === m.id;
             }).length;
 
             return (
               <button
-                key={month}
-                onClick={() => setSelectedMonth(month)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedMonth === month
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : count > 0
-                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    : 'bg-gray-50 text-gray-400 cursor-default'
-                  }`}
-                disabled={count === 0}
+                key={m.id}
+                onClick={() => toggleMonth(m.id)}
+                className={`
+                  relative flex flex-col items-center justify-center p-3 rounded-2xl transition-all border-2
+                  ${isSelected
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-4 ring-indigo-50'
+                    : count > 0
+                      ? 'border-slate-100 bg-white text-slate-700 hover:border-slate-300 shadow-sm'
+                      : 'border-slate-50 bg-slate-50 text-slate-400 hover:bg-slate-100'
+                  }
+                `}
               >
-                {monthName.charAt(0).toUpperCase() + monthName.slice(1)} {count > 0 && `(${count})`}
+                <span className="text-[10px] uppercase font-bold tracking-wider mb-1">{m.shortName}</span>
+                <span className="text-lg font-black">{m.id.split('-')[1]}</span>
+                {count > 0 && (
+                  <span className={`absolute -top-2 -right-1 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black shadow-sm ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-white'}`}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
-          <button
-            onClick={() => setSelectedMonth('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedMonth === 'all'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            Todos ({bills.length})
-          </button>
         </div>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Descrição</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-green-700 uppercase">A Receber</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-red-700 uppercase">A Pagar</th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredBills.map(bill => (
-                <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(bill.data).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{bill.descricao}</td>
-                  <td className="px-6 py-4 text-right">
-                    {bill.entrada > 0 ? (
-                      <span className="text-sm font-bold text-green-600 flex items-center justify-end gap-1">
-                        <ArrowUpCircle size={14} />
-                        R$ {bill.entrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {bill.saida > 0 ? (
-                      <span className="text-sm font-bold text-red-600 flex items-center justify-end gap-1">
-                        <ArrowDownCircle size={14} />
-                        R$ {bill.saida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleEdit(bill)}
-                        className="text-blue-600 hover:bg-blue-50 p-1 rounded"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete({ isOpen: true, id: bill.id })}
-                        className="text-red-600 hover:bg-red-50 p-1 rounded"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+      {/* Lista de Contas Categorizada por Mês */}
+      <div className="space-y-8">
+        {sortedMonthKeys.length > 0 ? (
+          sortedMonthKeys.map(monthKey => {
+            const monthBills = billsByMonth[monthKey].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+            const [year, monthNum] = monthKey.split('-');
+            const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+            const monthLabel = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
-              {bills.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                    Nenhuma conta cadastrada
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            const monthTotalIncome = monthBills.reduce((sum, b) => sum + b.entrada, 0);
+            const monthTotalExpense = monthBills.reduce((sum, b) => sum + b.saida, 0);
+
+            return (
+              <div key={monthKey} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <h2 className="text-lg font-black text-slate-800 capitalize flex items-center gap-2">
+                    <div className="w-2 h-6 bg-indigo-600 rounded-full"></div>
+                    {monthLabel}
+                  </h2>
+                  <div className="flex gap-4 text-xs font-bold">
+                    <span className="text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                      RECEBER: R$ {monthTotalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-rose-600 bg-rose-50 px-3 py-1 rounded-full">
+                      PAGAR: R$ {monthTotalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+                  <table className="w-full">
+                    <thead className="bg-slate-50/50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Data</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
+                        <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-40">A Receber</th>
+                        <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-40">A Pagar</th>
+                        <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {monthBills.map(bill => (
+                        <tr key={bill.id} className="group hover:bg-slate-50/50 transition-all">
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-bold text-slate-600">
+                              {/* Extrair dia e mês ignorando fuso horário ou carimbos de hora ISO */}
+                              {(() => {
+                                // Pega apenas a parte da data YYYY-MM-DD se houver 'T' ou espaços
+                                const cleanDate = bill.data.split('T')[0].split(' ')[0];
+                                const parts = cleanDate.split('-');
+                                if (parts.length === 3) {
+                                  return `${parts[2]}/${parts[1]}`;
+                                }
+                                return bill.data;
+                              })()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-extrabold text-slate-800">{bill.descricao}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {bill.entrada > 0 ? (
+                              <span className="text-sm font-black text-emerald-600">
+                                R$ {bill.entrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-slate-200">--</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {bill.saida > 0 ? (
+                              <span className="text-sm font-black text-rose-600">
+                                R$ {bill.saida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-slate-200">--</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEdit(bill)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => setConfirmDelete({ isOpen: true, id: bill.id })} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 p-20 text-center">
+            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
+              <FileText size={32} className="text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800">Nenhuma conta encontrada</h3>
+            <p className="text-slate-500 text-sm mt-1">Tente ajustar seus filtros ou busca</p>
+          </div>
+        )}
       </div>
 
       {/* Modal */}

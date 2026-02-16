@@ -37,11 +37,10 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
   const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterSubCategoryId, setFilterSubCategoryId] = useState('');
 
-  // Estados para modal de gráfico
+  // Estados de UI
   const [chartModalOpen, setChartModalOpen] = useState(false);
   const [chartModalType, setChartModalType] = useState<'income' | 'expense'>('income');
-  const [customIncomeColors, setCustomIncomeColors] = useState<string[]>(['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5']);
-  const [customExpenseColors, setCustomExpenseColors] = useState<string[]>(['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2']);
+  const [selectedCategoryIdForDetail, setSelectedCategoryIdForDetail] = useState<string | null>(null);
 
   // Calcular todas as tags únicas usadas
   const availableTags = useMemo(() => {
@@ -303,17 +302,25 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
       }
     });
 
-    const incomeData = Object.entries(incomeByCategory).map(([name, value]) => ({
-      name,
-      value,
-      percentage: 0
-    }));
+    const incomeData = Object.entries(incomeByCategory).map(([name, value]) => {
+      const category = categories.find(c => c.name === name);
+      return {
+        name,
+        value,
+        percentage: 0,
+        color: category?.color || '#10b981'
+      };
+    });
 
-    const expenseData = Object.entries(expenseByCategory).map(([name, value]) => ({
-      name,
-      value,
-      percentage: 0
-    }));
+    const expenseData = Object.entries(expenseByCategory).map(([name, value]) => {
+      const category = categories.find(c => c.name === name);
+      return {
+        name,
+        value,
+        percentage: 0,
+        color: category?.color || '#ef4444'
+      };
+    });
 
     // Calcular percentuais
     const totalIncome = incomeData.reduce((sum, item) => sum + item.value, 0);
@@ -330,9 +337,34 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
     return { incomeData, expenseData, totalIncome, totalExpense };
   }, [sortedTransactions, categories]); // Dependências atualizadas
 
-  // Cores para o gráfico - usando cores personalizadas
-  const INCOME_COLORS = customIncomeColors;
-  const EXPENSE_COLORS = customExpenseColors;
+  // Calcular dados de subcategorias para a categoria selecionada (drill-down)
+  const subCategoryChartData = useMemo(() => {
+    if (!selectedCategoryIdForDetail) return [];
+
+    const category = categories.find(c => String(c.id) === String(selectedCategoryIdForDetail));
+    if (!category) return [];
+
+    const subTotals: { [key: string]: number } = {};
+    const categoryTransactions = sortedTransactions.filter(t =>
+      String(t.categoryId) === String(selectedCategoryIdForDetail)
+    );
+
+    categoryTransactions.forEach(t => {
+      const subCat = category.subCategories.find(sc => String(sc.id) === String(t.subCategoryId));
+      const subName = subCat?.name || 'Sem Subcategoria';
+      subTotals[subName] = (subTotals[subName] || 0) + t.amount;
+    });
+
+    const total = Object.values(subTotals).reduce((sum, val) => sum + val, 0);
+
+    return Object.entries(subTotals).map(([name, value], index) => ({
+      name,
+      value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      // Gerar variações de cores baseadas na cor da categoria
+      color: `hsla(${210 + (index * 45)}, 70%, 50%, 0.8)`
+    }));
+  }, [selectedCategoryIdForDetail, sortedTransactions, categories]);
 
   return (
     <div className="space-y-6">
@@ -476,7 +508,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Gráfico de Entradas */}
           {chartData.incomeData.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setChartModalType('income'); setChartModalOpen(true); }}>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative hover:shadow-md transition-shadow">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
@@ -486,10 +518,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
                   onClick={(e) => {
                     e.stopPropagation();
                     setChartModalType('income');
+                    setSelectedCategoryIdForDetail(null);
                     setChartModalOpen(true);
                   }}
                   className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                  title="Expandir e personalizar"
+                  title="Ampliar gráfico"
                 >
                   <Maximize2 size={18} />
                 </button>
@@ -510,8 +543,20 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {chartData.incomeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={INCOME_COLORS[index % INCOME_COLORS.length]} />
+                    {chartData.incomeData.map((entry: any, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          const category = categories.find(c => c.name === entry.name);
+                          if (category) {
+                            setSelectedCategoryIdForDetail(category.id);
+                            setChartModalType('income');
+                            setChartModalOpen(true);
+                          }
+                        }}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -525,7 +570,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
 
           {/* Gráfico de Saídas */}
           {chartData.expenseData.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setChartModalType('expense'); setChartModalOpen(true); }}>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative hover:shadow-md transition-shadow">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
@@ -535,10 +580,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
                   onClick={(e) => {
                     e.stopPropagation();
                     setChartModalType('expense');
+                    setSelectedCategoryIdForDetail(null);
                     setChartModalOpen(true);
                   }}
                   className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  title="Expandir e personalizar"
+                  title="Ampliar gráfico"
                 >
                   <Maximize2 size={18} />
                 </button>
@@ -559,8 +605,20 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {chartData.expenseData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
+                    {chartData.expenseData.map((entry: any, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          const category = categories.find(c => c.name === entry.name);
+                          if (category) {
+                            setSelectedCategoryIdForDetail(category.id);
+                            setChartModalType('expense');
+                            setChartModalOpen(true);
+                          }
+                        }}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -574,111 +632,114 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, setTransactio
         </div>
       )}
 
-      {/* Modal de Gráfico Expandido com Personalização de Cores */}
+      {/* Modal de Gráfico Expandido / Drill-Down */}
       {chartModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setChartModalOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${chartModalType === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                {chartModalType === 'income' ? 'Entradas' : 'Saídas'} por Categoria
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setChartModalOpen(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full ${chartModalType === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                  {selectedCategoryIdForDetail
+                    ? `Detalhamento: ${categories.find(c => c.id === selectedCategoryIdForDetail)?.name}`
+                    : (chartModalType === 'income' ? 'Entradas por Categoria' : 'Saídas por Categoria')
+                  }
+                </h2>
+                {selectedCategoryIdForDetail && (
+                  <button
+                    onClick={() => setSelectedCategoryIdForDetail(null)}
+                    className="text-sm text-indigo-600 font-medium hover:underline mt-1"
+                  >
+                    ← Voltar para visão geral
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setChartModalOpen(false)}
-                className="p-3 text-slate-400 hover:text-white hover:bg-red-500 rounded-lg transition-all text-3xl font-bold leading-none w-12 h-12 flex items-center justify-center"
-                title="Fechar"
+                className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600 rounded-full transition-all font-bold text-xl"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-8">
-              {/* Gráfico Grande */}
-              <div className="mb-8">
-                <div className="text-center mb-6">
-                  <p className={`text-4xl font-bold ${chartModalType === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    R$ {(chartModalType === 'income' ? chartData.totalIncome : chartData.totalExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-sm text-slate-500 mt-2">
-                    Total de {chartModalType === 'income' ? 'Entradas' : 'Saídas'}
-                  </p>
-                </div>
-                <ResponsiveContainer width="100%" height={500}>
-                  <PieChart>
-                    <Pie
-                      data={chartModalType === 'income' ? chartData.incomeData : chartData.expenseData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
-                      outerRadius={150}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {(chartModalType === 'income' ? chartData.incomeData : chartData.expenseData).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={(chartModalType === 'income' ? INCOME_COLORS : EXPENSE_COLORS)[index % (chartModalType === 'income' ? INCOME_COLORS : EXPENSE_COLORS).length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="mb-8 text-center">
+                <p className={`text-4xl font-extrabold ${chartModalType === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  R$ {
+                    (selectedCategoryIdForDetail
+                      ? subCategoryChartData.reduce((sum, item) => sum + item.value, 0)
+                      : (chartModalType === 'income' ? chartData.totalIncome : chartData.totalExpense)
+                    ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                  }
+                </p>
+                <p className="text-slate-500 mt-2 font-medium">
+                  {selectedCategoryIdForDetail ? 'Total da Categoria' : `Total de ${chartModalType === 'income' ? 'Entradas' : 'Saídas'}`}
+                </p>
               </div>
 
-              {/* Personalização de Cores */}
-              <div className="border-t border-slate-200 pt-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Personalizar Cores</h3>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                  {(chartModalType === 'income' ? customIncomeColors : customExpenseColors).map((color, index) => (
-                    <div key={index} className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-slate-600">Cor {index + 1}</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={color}
-                          onChange={(e) => {
-                            const newColors = [...(chartModalType === 'income' ? customIncomeColors : customExpenseColors)];
-                            newColors[index] = e.target.value;
-                            if (chartModalType === 'income') {
-                              setCustomIncomeColors(newColors);
-                            } else {
-                              setCustomExpenseColors(newColors);
-                            }
-                          }}
-                          className="w-full h-10 rounded-lg border border-slate-200 cursor-pointer"
-                        />
-                        <div
-                          className="w-10 h-10 rounded-lg border border-slate-200"
-                          style={{ backgroundColor: color }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={selectedCategoryIdForDetail ? subCategoryChartData : (chartModalType === 'income' ? chartData.incomeData : chartData.expenseData)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={selectedCategoryIdForDetail ? 80 : 0}
+                        outerRadius={150}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                      >
+                        {(selectedCategoryIdForDetail ? subCategoryChartData : (chartModalType === 'income' ? chartData.incomeData : chartData.expenseData)).map((entry: any, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.color}
+                            className={!selectedCategoryIdForDetail ? "cursor-pointer hover:opacity-80" : ""}
+                            onClick={() => {
+                              if (!selectedCategoryIdForDetail) {
+                                const category = categories.find(c => c.name === entry.name);
+                                if (category) setSelectedCategoryIdForDetail(category.id);
+                              }
+                            }}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
 
-                {/* Botões de Ação */}
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => {
-                      if (chartModalType === 'income') {
-                        setCustomIncomeColors(['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5']);
-                      } else {
-                        setCustomExpenseColors(['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2']);
-                      }
-                    }}
-                    className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
-                  >
-                    Restaurar Padrão
-                  </button>
-                  <button
-                    onClick={() => setChartModalOpen(false)}
-                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md"
-                  >
-                    <Save size={18} />
-                    Salvar
-                  </button>
+                <div className="space-y-4">
+                  <h4 className="font-bold text-slate-700 uppercase text-xs tracking-wider mb-4 border-b pb-2">
+                    {selectedCategoryIdForDetail ? 'Subcategorias' : 'Categorias'}
+                  </h4>
+                  <div className="grid grid-cols-1 gap-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                    {(selectedCategoryIdForDetail ? subCategoryChartData : (chartModalType === 'income' ? chartData.incomeData : chartData.expenseData)).map((item: any, index) => (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors ${!selectedCategoryIdForDetail ? 'cursor-pointer' : ''}`}
+                        onClick={() => {
+                          if (!selectedCategoryIdForDetail) {
+                            const category = categories.find(c => c.name === item.name);
+                            if (category) setSelectedCategoryIdForDetail(category.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="font-semibold text-slate-700">{item.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900 text-sm">R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-[10px] text-slate-400 font-bold">{item.percentage.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
