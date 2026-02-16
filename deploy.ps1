@@ -23,7 +23,7 @@ git commit -m "Deploy: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 
 # 4. Fazer push para gh-pages
 Write-Host "`n🌐 Fazendo deploy para GitHub Pages..." -ForegroundColor Yellow
-$remoteUrl = git -C .. config --get remote.origin.url
+$remoteUrl = git config --get remote.origin.url
 git push -f $remoteUrl main:gh-pages
 
 if ($LASTEXITCODE -eq 0) {
