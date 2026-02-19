@@ -147,6 +147,7 @@ const App: React.FC = () => {
             type: f.entrada_saida === 'INCOME' ? 'INCOME' : 'EXPENSE',
             recorrente: f['recorrente?'] === 'sim',
             mes: f.mes,
+            endMonth: f.fim_periodo,
             categoryId: f.categoria,
             subCategoryId: f.subcategoria
           }));

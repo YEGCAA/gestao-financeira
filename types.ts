@@ -50,6 +50,7 @@ export interface ForecastExpense {
   type: TransactionType; // INCOME ou EXPENSE
   recorrente: boolean; // recorrente (sim/não)
   mes: string; // mês
+  endMonth?: string; // fim do período
   categoryId?: string;
   subCategoryId?: string;
 }

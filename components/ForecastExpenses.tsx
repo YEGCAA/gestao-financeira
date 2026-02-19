@@ -28,6 +28,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
         type: 'EXPENSE' as 'INCOME' | 'EXPENSE',
         recorrente: false,
         mes: new Date().toISOString().slice(0, 7),
+        endMonth: new Date().toISOString().slice(0, 7),
         categoryId: '',
         subCategoryId: ''
     });
@@ -40,8 +41,8 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
     const comparisonData = useMemo(() => {
         const monthsList = [];
         const now = new Date();
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        for (let i = 0; i < 6; i++) { // Updated: Loop from current month forward
+            const d = new Date(now.getFullYear(), now.getMonth() + i, 1); // Updated: Get months ahead
             monthsList.push({
                 monthKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
                 monthLabel: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
@@ -61,8 +62,10 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
 
             // Previsto (Forecasts)
             const forecastInMonth = forecasts.filter(f => {
-                const forecastMes = f.mes.includes('-') ? f.mes : `${now.getFullYear()}-${f.mes.padStart(2, '0')}`;
-                return forecastMes === m.monthKey;
+                const monthKey = m.monthKey;
+                const start = f.mes;
+                const end = f.endMonth || f.mes;
+                return monthKey >= start && monthKey <= end;
             });
             m.previsto = forecastInMonth.reduce((sum, f) => f.type === 'INCOME' ? sum + f.amount : sum - f.amount, 0);
         });
@@ -88,6 +91,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
             type: forecast.type,
             recorrente: forecast.recorrente,
             mes: forecast.mes,
+            endMonth: forecast.endMonth || '',
             categoryId: forecast.categoryId || '',
             subCategoryId: forecast.subCategoryId || ''
         });
@@ -103,6 +107,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
             entrada_saida: formData.type,
             'recorrente?': formData.recorrente ? 'sim' : 'nao',
             mes: formData.mes,
+            fim_periodo: formData.endMonth || null,
             categoria: formData.categoryId || null,
             subcategoria: formData.subCategoryId || null
         };
@@ -124,6 +129,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                     type: data[0].entrada_saida as 'INCOME' | 'EXPENSE',
                     recorrente: data[0]['recorrente?'] === 'sim',
                     mes: data[0].mes,
+                    endMonth: data[0].fim_periodo,
                     categoryId: data[0].categoria,
                     subCategoryId: data[0].subcategoria
                 };
@@ -143,6 +149,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                     type: data[0].entrada_saida as 'INCOME' | 'EXPENSE',
                     recorrente: data[0]['recorrente?'] === 'sim',
                     mes: data[0].mes,
+                    endMonth: data[0].fim_periodo,
                     categoryId: data[0].categoria,
                     subCategoryId: data[0].subcategoria
                 };
@@ -151,7 +158,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
 
             setIsModalOpen(false);
             setEditingId(null);
-            setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: new Date().toISOString().slice(0, 7), categoryId: '', subCategoryId: '' });
+            setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: `${selectedYear}-01`, endMonth: '', categoryId: '', subCategoryId: '' });
         } catch (error: any) {
             console.error("❌ Erro ao salvar:", error);
             alert(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
@@ -171,8 +178,12 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
         }
     };
 
-    // Filtrar pelo ano selecionado
-    const yearForecasts = forecasts.filter(f => f.mes.startsWith(selectedYear.toString()));
+    // Filtrar pelo ano selecionado - Considerar o range
+    const yearForecasts = forecasts.filter(f => {
+        const startYear = parseInt(f.mes.split('-')[0]);
+        const endYear = f.endMonth ? parseInt(f.endMonth.split('-')[0]) : startYear;
+        return selectedYear >= startYear && selectedYear <= endYear;
+    });
 
     // Agrupar por tipo, descrição e mês
     const groupedItems = yearForecasts.reduce((acc: any, forecast) => {
@@ -187,12 +198,20 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                 months: {}
             };
         }
-        const month = parseInt(forecast.mes.split('-')[1]);
-        acc[type][forecast.description].months[month] = {
-            value: forecast.amount,
-            id: forecast.id,
-            recorrente: forecast.recorrente
-        };
+
+        const startMonth = forecast.mes;
+        const endMonth = forecast.endMonth || forecast.mes;
+
+        for (let m = 1; m <= 12; m++) {
+            const currentMonthStr = `${selectedYear}-${String(m).padStart(2, '0')}`;
+            if (currentMonthStr >= startMonth && currentMonthStr <= endMonth) {
+                acc[type][forecast.description].months[m] = {
+                    value: forecast.amount,
+                    id: forecast.id,
+                    recorrente: forecast.recorrente
+                };
+            }
+        }
         return acc;
     }, { INCOME: {}, EXPENSE: {} });
 
@@ -202,15 +221,17 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
     // Calcular totais por mês e tipo
     const monthlyIncomeTotals = Array(12).fill(0).map((_, index) => {
         const month = index + 1;
+        const monthStr = `${selectedYear}-${String(month).padStart(2, '0')}`;
         return yearForecasts
-            .filter(f => f.type === 'INCOME' && parseInt(f.mes.split('-')[1]) === month)
+            .filter(f => f.type === 'INCOME' && monthStr >= f.mes && monthStr <= (f.endMonth || f.mes))
             .reduce((sum, f) => sum + f.amount, 0);
     });
 
     const monthlyExpenseTotals = Array(12).fill(0).map((_, index) => {
         const month = index + 1;
+        const monthStr = `${selectedYear}-${String(month).padStart(2, '0')}`;
         return yearForecasts
-            .filter(f => (f.type === 'EXPENSE' || !f.type) && parseInt(f.mes.split('-')[1]) === month)
+            .filter(f => (f.type === 'EXPENSE' || !f.type) && monthStr >= f.mes && monthStr <= (f.endMonth || f.mes))
             .reduce((sum, f) => sum + f.amount, 0);
     });
 
@@ -360,8 +381,9 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                     </select>
                     <button
                         onClick={() => {
+                            const currentMonth = new Date().toISOString().slice(0, 7);
                             setEditingId(null);
-                            setFormData({ description: '', amount: '', type: 'INCOME', recorrente: false, mes: `${selectedYear}-01`, categoryId: '', subCategoryId: '' });
+                            setFormData({ description: '', amount: '', type: 'INCOME', recorrente: false, mes: currentMonth, endMonth: currentMonth, categoryId: '', subCategoryId: '' });
                             setIsModalOpen(true);
                         }}
                         className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all font-bold shadow-lg shadow-emerald-100"
@@ -371,8 +393,9 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                     </button>
                     <button
                         onClick={() => {
+                            const currentMonth = new Date().toISOString().slice(0, 7);
                             setEditingId(null);
-                            setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: `${selectedYear}-01`, categoryId: '', subCategoryId: '' });
+                            setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: currentMonth, endMonth: currentMonth, categoryId: '', subCategoryId: '' });
                             setIsModalOpen(true);
                         }}
                         className="flex items-center gap-2 px-5 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all font-bold shadow-lg shadow-rose-100"
@@ -638,7 +661,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-200 max-h-[95vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
                         <div className="flex items-center justify-between mb-8">
                             <h2 className="text-2xl font-black text-slate-900">
                                 {editingId ? 'Editar Lançamento' : 'Novo Lançamento'}
@@ -666,20 +689,19 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                                 </button>
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Descrição</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.description}
-                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-bold text-slate-800"
-                                    placeholder="Ex: Aluguel, Vendas, Salários"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Descrição</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.description}
+                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-bold text-slate-800"
+                                        placeholder="Ex: Aluguel, Vendas, Salários"
+                                    />
+                                </div>
+                                <div className="md:col-span-1">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Valor (R$)</label>
                                     <input
                                         type="number"
@@ -691,13 +713,35 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                                         placeholder="0,00"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mês de Referência</label>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mês Início</label>
                                     <input
                                         type="month"
                                         required
                                         value={formData.mes}
-                                        onChange={e => setFormData({ ...formData, mes: e.target.value })}
+                                        onChange={e => {
+                                            const newMes = e.target.value;
+                                            setFormData(prev => {
+                                                // Se o mês fim era igual ao mês início anterior, atualiza ele também
+                                                if (prev.endMonth === prev.mes || !prev.endMonth) {
+                                                    return { ...prev, mes: newMes, endMonth: newMes };
+                                                }
+                                                return { ...prev, mes: newMes };
+                                            });
+                                        }}
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-bold text-slate-800"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mês Fim</label>
+                                    <input
+                                        type="month"
+                                        required
+                                        value={formData.endMonth}
+                                        onChange={e => setFormData({ ...formData, endMonth: e.target.value })}
                                         className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-bold text-slate-800"
                                     />
                                 </div>
@@ -753,7 +797,7 @@ const ForecastExpenses: React.FC<ForecastExpensesProps> = ({ forecasts, setForec
                                     onClick={() => {
                                         setIsModalOpen(false);
                                         setEditingId(null);
-                                        setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: `${selectedYear}-01`, categoryId: '', subCategoryId: '' });
+                                        setFormData({ description: '', amount: '', type: 'EXPENSE', recorrente: false, mes: new Date().toISOString().slice(0, 7), endMonth: '', categoryId: '', subCategoryId: '' });
                                     }}
                                     className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all"
                                 >
